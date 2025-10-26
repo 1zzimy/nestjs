@@ -5,6 +5,7 @@ import { SwaggerModule } from '@nestjs/swagger';
 import { swaggerConfig } from './config/swagger.config';
 import { ApiResultInterceptor } from './common/interceptors/api-result.interceptor';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
+import cookieParser from 'cookie-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
@@ -15,9 +16,11 @@ async function bootstrap() {
   }));
 
   app.useGlobalInterceptors(app.get(ApiResultInterceptor)); // 전역 인터셉터 등록
-  
+
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, document); // 'docs': 문서를 띄울 경로 prefix
+
+  app.use(cookieParser());
 
   app.enableCors({
     origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
