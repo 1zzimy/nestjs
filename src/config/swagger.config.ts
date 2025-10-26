@@ -6,4 +6,5 @@ export const swaggerConfig = new DocumentBuilder()
   .setVersion('v1.0')
   .addServer('http://localhost:3000')
   .addTag('User', '회원 관련 API')
+  .addTag('Auth', '인증 관련 API')
   .build();
