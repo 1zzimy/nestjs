@@ -1,4 +1,4 @@
-import { GoneException, Injectable, NotFoundException, Logger, ConflictException } from '@nestjs/common';
+import { GoneException, Injectable, NotFoundException, Logger, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
@@ -51,12 +51,13 @@ export class UsersService {
         if(exists) throw new ConflictException('이미 존재하는 이메일입니다.');
     }
 
-    async createUser(createUserDto: CreateUserDto): Promise<void> {
+    async createUser(createUserDto: CreateUserDto): Promise<UserInfoDto> {
         this.logger.log(`회원 가입 실행 - email: ${createUserDto.email}`);
-        this.existsByEmail(createUserDto.email);
+        await this.existsByEmail(createUserDto.email);
         const user = this.usersRepository.create(createUserDto);
         await this.usersRepository.save(user);
         this.logger.log(`회원 가입 완료 - id: ${user.id}, email: ${user.email}`);
+        return plainToInstance(UserInfoDto, user, { excludeExtraneousValues: true });
     }
 
     // soft delete (isActive = false)
@@ -65,5 +66,38 @@ export class UsersService {
         const found = await this.getUserById(id);
         await this.usersRepository.update(found.id, { isActive: false });
         this.logger.log(`회원 탈퇴 완료 - id: ${id}`);
+    }
+
+    async findActiveUserByEmailWithPassword(email: string): Promise<User | null> {
+        this.logger.log(`이메일로 회원 조회 (로그인) - email: ${email}`);
+        const user = await this.usersRepository.findOne({
+            where: { email },
+            select: ['id', 'email', 'pwd', 'name', 'isActive'],
+        });
+
+        if (!user) {
+            this.logger.warn(`회원 없음 - email: ${email}`);
+            return null;
+        }
+
+        if (!user.isActive) {
+            this.logger.warn(`탈퇴한 회원 접근 - email: ${email}`);
+            throw new GoneException('탈퇴한 회원입니다.');
+        }
+
+        return user;
+    }
+
+    async findInactiveUserByEmail(email: string): Promise<User | null> {
+        this.logger.log(`비활성 회원 조회 - email: ${email}`);
+        return this.usersRepository.findOne({
+            where: { email, isActive: false },
+            select: ['id', 'email', 'pwd', 'name', 'isActive'],
+        });
+    }
+
+    async activateUser(id: number): Promise<void> {
+        this.logger.log(`회원 활성화 - id: ${id}`);
+        await this.usersRepository.update(id, { isActive: true });
     }
 }
